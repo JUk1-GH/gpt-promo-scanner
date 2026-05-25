@@ -16,6 +16,10 @@ token = ""
 [clash]
 # Clash Verge 的 Unix socket 路径
 socket = "/tmp/verge/verge-mihomo.sock"
+# Clash external-controller HTTP 地址（Windows 上通常使用这个）
+controller = "http://127.0.0.1:9097"
+# 如果 Clash API 设置了 secret，在这里填写
+secret = ""
 
 # 代理组名（取决于你的 Clash 配置）
 [clash.proxy_groups]

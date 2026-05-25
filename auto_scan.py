@@ -24,18 +24,19 @@
 """
 import json
 import os
-import subprocess
 import sys
 import time
 import webbrowser
 from urllib.parse import quote
+from urllib.request import Request, urlopen
 from datetime import datetime
 
 import config
 
 # ─── 配置 ────────────────────────────────────────────────────
 
-CLASH_SOCKET = config.get_clash_socket()
+CLASH_CONTROLLER = config.get_clash_controller().rstrip("/")
+CLASH_SECRET = config.get_clash_secret()
 PROXY_URL = config.get_proxy_url()
 REQUEST_DELAY = 0.8
 OUTPUT_DIR = config.get_output_dir()
@@ -205,22 +206,30 @@ def to_usd(amount, currency):
 # ─── Clash API ───────────────────────────────────────────────
 
 def _curl(path, method="GET", data=None):
-    url = f"http://localhost{path}"
-    cmd = ["curl", "-s", "--unix-socket", CLASH_SOCKET]
-    if method != "GET":
-        cmd += ["-X", method]
+    body = None
+    headers = {}
     if data:
-        cmd += ["-H", "Content-Type: application/json", "-d", json.dumps(data)]
-    cmd.append(url)
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-    if r.returncode != 0:
-        raise RuntimeError(f"curl error: {r.stderr}")
-    return r.stdout
+        body = json.dumps(data).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    if CLASH_SECRET:
+        headers["Authorization"] = f"Bearer {CLASH_SECRET}"
+
+    req = Request(f"{CLASH_CONTROLLER}{path}", data=body, headers=headers, method=method)
+    try:
+        with urlopen(req, timeout=5) as resp:
+            return resp.read().decode("utf-8")
+    except Exception:
+        return None
 
 
 def get_clash_mode():
     raw = _curl("/configs")
-    return json.loads(raw).get("mode", "rule")
+    if not raw:
+        return "rule"
+    try:
+        return json.loads(raw).get("mode", "rule")
+    except Exception:
+        return "rule"
 
 
 def get_proxy_group():
@@ -231,7 +240,12 @@ def get_proxy_group():
 
 def list_nodes():
     raw = _curl("/proxies")
-    data = json.loads(raw)
+    if not raw:
+        return "?", []
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return "?", []
     proxies = data.get("proxies", {})
     group = proxies.get(get_proxy_group(), {})
     current = group.get("now", "?")
@@ -247,6 +261,8 @@ def list_nodes():
 def test_latency(node):
     encoded = quote(node, safe="")
     r = _curl(f"/proxies/{encoded}/delay?timeout=5000&url=https://www.google.com")
+    if not r:
+        return -1
     try:
         return json.loads(r).get("delay", -1)
     except Exception:
@@ -261,8 +277,13 @@ def switch_to(node):
 
 def get_current_node():
     raw = _curl("/proxies")
+    if not raw:
+        return "?"
     group = get_proxy_group()
-    return json.loads(raw).get("proxies", {}).get(group, {}).get("now", "?")
+    try:
+        return json.loads(raw).get("proxies", {}).get(group, {}).get("now", "?")
+    except Exception:
+        return "?"
 
 
 # ─── Token ───────────────────────────────────────────────────

@@ -74,6 +74,24 @@ def get_clash_socket() -> str:
     return cfg.get("clash", {}).get("socket", "/tmp/verge/verge-mihomo.sock")
 
 
+def get_clash_controller() -> str:
+    """获取 Clash external-controller 地址"""
+    env = os.getenv("CLASH_CONTROLLER")
+    if env:
+        return env
+    cfg = _load_config()
+    return cfg.get("clash", {}).get("controller", "http://127.0.0.1:9097")
+
+
+def get_clash_secret() -> str:
+    """获取 Clash external-controller secret"""
+    env = os.getenv("CLASH_SECRET")
+    if env:
+        return env
+    cfg = _load_config()
+    return cfg.get("clash", {}).get("secret", "")
+
+
 def get_proxy_url() -> str:
     """获取 HTTP 代理地址"""
     env = os.getenv("HTTP_PROXY") or os.getenv("http_proxy") or os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
